@@ -1,0 +1,69 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+  - http://cloudify.co/spec/cloudify/5.0.0/types.yaml
+  - plugin:cloudify-fabric-plugin
+
+inputs:
+  ip:
+    type: string
+  ssh_user:
+    type: string
+  private_key_path:
+    type: string
+
+node_templates:
+  vm:
+    type: cloudify.nodes.Compute
+    properties:
+      agent_config:
+        user: { get_input: ssh_user }
+        key: { get_input: private_key_path }
+      ip: { get_input: ip }
+
+  app:
+    type: cloudify.nodes.SoftwareComponent
+    interfaces:
+      # Standard lifecycle operations. Each one runs a script.
+      # Since the script plugin operates, by default, on the agent side,
+      # these scripts will run on the VM in which this node template
+      # is contained.
+      cloudify.interfaces.lifecycle:
+        create: scripts/app-create.sh
+        delete: scripts/app-delete.sh
+      # Custom maintenance interface, containing custom operations.
+      maintenance:
+        update: scripts/app-update.py
+        commit: scripts/app-commit.py
+        poll:
+          # This is an example how to run a script via the Fabric plugin.
+          # The fabric plugin operates on the manager side; hence, the plugin
+          # code itself runs on the manager. It establishes an SSH connection
+          # to the target (see below), pushes the script and runs it there.
+          implementation: fabric.fabric_plugin.tasks.run_script
+          inputs:
+            script_path: scripts/app-poll.sh
+            # fabric_env tells Cloudify how to connect to the remote host
+            # in order to run the script. We specify the SSH user and
+            # the path to the private key.
+            # There is no need to specify the target hostname/IP address;
+            # Cloudify automatically defaults this to the private IP
+            # of the VM in which this node template is contained (see
+            # the "cloudify.relationships.contained_in" relationship below).
+            fabric_env:
+              user: { get_input: ssh_user }
+              key_filename: { get_input: private_key_path }
+    relationships:
+      # Denotes a containment relationship. This node template is contained
+      # within the "vm" node template. Since the "vm" node template is of type
+      # "cloudify.nodes.Compute" (or a subtype thereof), any agent-side operations
+      # mapped to this node template will end up being run by the agent installed
+      # on the containing VM.
+      - target: vm
+        type: cloudify.relationships.contained_in
+
+workflows:
+  # Define a custom workflow called "rollout". The workflow is implemented as a
+  # Python script.
+  rollout:
+    mapping: scripts/rollout.py
