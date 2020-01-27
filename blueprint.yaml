@@ -5,62 +5,88 @@ imports:
   - plugin:cloudify-fabric-plugin
 
 inputs:
-  ip:
+  infra_blueprint:
+    description: >
+      Name of infrastructure blueprint to deploy.
     type: string
-  ssh_user:
+    constraints:
+      - valid_values:
+          - infra-openstack
+          - infra-azure
+          - infra-aws
+          - infra-gcp
+  infra_archive:
+    description: >
+      URL of infra zip file.
     type: string
-  private_key_path:
-    type: string
+    default: 'https://github.com/cloudify-community/blueprint-examples/releases/download/5.0.0-15/getting-started-infra.zip'
+  infra_exists:
+    description: >
+      Whether a getting started infrastructure blueprint has already been uploaded to the manager or not.
+    default: false
 
 node_templates:
-  vm:
-    type: cloudify.nodes.Compute
+  # Represents the infrastructure.
+  infrastructure:
+    type: cloudify.nodes.Component
     properties:
-      agent_config:
-        user: { get_input: ssh_user }
-        key: { get_input: private_key_path }
-      ip: { get_input: ip }
+      resource_config:
+        blueprint:
+          id: { get_input: infra_blueprint }
+          blueprint_archive: { get_input: infra_archive }
+          external_resource: { get_input: infra_exists }
 
+  # Represents an application.
   app:
     type: cloudify.nodes.SoftwareComponent
     interfaces:
       # Standard lifecycle operations. Each one runs a script.
-      # Since the script plugin operates, by default, on the agent side,
-      # these scripts will run on the VM in which this node template
-      # is contained.
+      # All scripts here run via the fabric plugin, in "script runner" mode:
+      #
+      # * The plugin code itself runs on the Manager (the default executor of
+      #   the fabric plugin is "central_deployment_agent")
+      # * The plugin operation establishes n SSH connection to the target,
+      #   transfers the script, and executes it there.
       cloudify.interfaces.lifecycle:
-        create: scripts/app-create.sh
-        delete: scripts/app-delete.sh
+        create:
+          implementation: fabric.fabric_plugin.tasks.run_script
+          inputs:
+            script_path: scripts/app-create.sh
+            # fabric_env tells Cloudify how to connect to the remote host
+            # in order to run the script. We specify the host IP, the
+            # SSH user to use, and the the path to the private key.
+            # Note that since the plugin's code runs on the manager (as is
+            # the default for the fabric plugin), the key_filename should point
+            # to a file on the Manager.
+            fabric_env: &fabric_env
+              host_string: { get_capability: [ { get_attribute: [ infrastructure, deployment, id ] }, endpoint ]}
+              user: { get_capability: [ { get_attribute: [ infrastructure, deployment, id ] }, user ]}
+              key_filename: { get_capability: [ { get_attribute: [ infrastructure, deployment, id ] }, key_filename ]}
+        delete:
+          implementation: fabric.fabric_plugin.tasks.run_script
+          inputs:
+            script_path: scripts/app-delete.sh
+            fabric_env: *fabric_env
       # Custom maintenance interface, containing custom operations.
       maintenance:
-        update: scripts/app-update.py
-        commit: scripts/app-commit.py
+        update:
+          implementation: fabric.fabric_plugin.tasks.run_script
+          inputs:
+            script_path: scripts/app-update.py
+            fabric_env: *fabric_env
+        commit:
+          implementation: fabric.fabric_plugin.tasks.run_script
+          inputs:
+            script_path: scripts/app-commit.py
+            fabric_env: *fabric_env
         poll:
-          # This is an example how to run a script via the Fabric plugin.
-          # The fabric plugin operates on the manager side; hence, the plugin
-          # code itself runs on the manager. It establishes an SSH connection
-          # to the target (see below), pushes the script and runs it there.
           implementation: fabric.fabric_plugin.tasks.run_script
           inputs:
             script_path: scripts/app-poll.sh
-            # fabric_env tells Cloudify how to connect to the remote host
-            # in order to run the script. We specify the SSH user and
-            # the path to the private key.
-            # There is no need to specify the target hostname/IP address;
-            # Cloudify automatically defaults this to the private IP
-            # of the VM in which this node template is contained (see
-            # the "cloudify.relationships.contained_in" relationship below).
-            fabric_env:
-              user: { get_input: ssh_user }
-              key_filename: { get_input: private_key_path }
+            fabric_env: *fabric_env
     relationships:
-      # Denotes a containment relationship. This node template is contained
-      # within the "vm" node template. Since the "vm" node template is of type
-      # "cloudify.nodes.Compute" (or a subtype thereof), any agent-side operations
-      # mapped to this node template will end up being run by the agent installed
-      # on the containing VM.
-      - target: vm
-        type: cloudify.relationships.contained_in
+      - target: infrastructure
+        type: cloudify.relationships.depends_on
 
 workflows:
   # Define a custom workflow called "rollout". The workflow is implemented as a

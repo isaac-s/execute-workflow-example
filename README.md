@@ -17,18 +17,12 @@ First, upload the blueprint:
 cfy blueprints upload blueprint.yaml -b execute_workflow
 ```
 
-Next, create a YAML file containing inputs:
-
-```yaml
-ip: 10.0.0.24
-ssh_user: centos
-private_key_path: /etc/cloudify/default_key.pem
-```
-
-Next, create a deployment:
+Next, create a deployment (this command-line example is for OpenStack. For AWS,
+GCP or Azure, replace `infra-openstack` with `infra-aws`, `infra-gcp` or `infra-azure`,
+respectively):
 
 ```bash
-cfy deployments create dep_1 -b execute_workflow -i inputs.yaml
+cfy deployments create dep_1 -b execute_workflow -i infra_blueprint=infra-openstack
 ```
 
 ## Installation
@@ -69,27 +63,6 @@ And then (assuming the node instance ID is `app_123456`):
 ```bash
 cfy executions start execute_operation -p operation=maintenance.poll -p node_instance_ids=[app_123456]
 ```
-
-### Fabric (SSH)
-
-The `poll` operation is implemeted using the Fabric plugin. The Fabric plugin has multiple tasks,
-of which `run_script` is the most popular. `run_script` pushes the script (denoted by the `script_path`
-parameter) to the target VM, and executes it there.
-
-Of significant importance is the `fabric_env` parameter, which is a dictionary passed as-is to
-the Fabric library. You can read about available Fabric environment parameters in the Fabric
-documentation: https://docs.fabfile.org/en/1.12.1/usage/env.html
-
-Normally, you would need to specify the `user` and `key_filename` parameters, instructing the plugin
-which user and which key file to use for SSH.
-
-**NOTE**: the `key_filename` should point to a file on the *Cloudify Manager* VM, as the Fabric code
-itself runs on the manager.
-
-The Fabric plugin provides a shortcut: if the enclosing node template (`app` in our case) has a
-`contained_in` relationship (directly or indirectly) to a node template of type `cloudify.nodes.Compute`
-(or a subtype thereof), then the `host_string` parameter in `fabric_env` is defaulted to the private IP
-of the containing VM. Hence, in our example, we omitted `host_string`; the plugin will calculate it automatically.
 
 ## Executing a Cusotm Workflow
 
