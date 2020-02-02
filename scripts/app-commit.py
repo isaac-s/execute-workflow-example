@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from cloudify import ctx
 from cloudify.exceptions import NonRecoverableError
 

@@ -18,11 +18,11 @@ cfy blueprints upload blueprint.yaml -b execute_workflow
 ```
 
 Next, create a deployment (this command-line example is for OpenStack. For AWS,
-GCP or Azure, replace `infra-openstack` with `infra-aws`, `infra-gcp` or `infra-azure`,
+GCP or Azure, replace `openstack` with `aws`, `gcp` or `azure`,
 respectively):
 
 ```bash
-cfy deployments create dep_1 -b execute_workflow -i infra_blueprint=infra-openstack
+cfy deployments create dep_1 -b execute_workflow -i infra_name=openstack
 ```
 
 ## Installation
@@ -44,7 +44,7 @@ This can be done by the `execute_operation` workflow. In this example,
 we will run the `poll` operation on the `app` node.
 
 ```bash
-cfy executions start execute_operation -p operation=maintenance.poll -p node_ids=[app]
+cfy executions start execute_operation -d dep_1 -p operation=maintenance.poll -p node_ids=[app]
 ```
 
 This command will execute the `poll` operation of the `maintenance` interface,
@@ -61,7 +61,7 @@ cfy node-instances list -d dep_1 -n app
 And then (assuming the node instance ID is `app_123456`):
 
 ```bash
-cfy executions start execute_operation -p operation=maintenance.poll -p node_instance_ids=[app_123456]
+cfy executions start execute_operation -d dep_1 -p operation=maintenance.poll -p node_instance_ids=[app_123456]
 ```
 
 ## Executing a Cusotm Workflow
