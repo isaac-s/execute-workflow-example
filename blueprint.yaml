@@ -80,6 +80,7 @@ node_templates:
             fabric_env: *fabric_env
         commit:
           implementation: fabric.fabric_plugin.tasks.run_script
+          max_retries: 0
           inputs:
             script_path: scripts/app-commit.py
             fabric_env: *fabric_env
@@ -97,4 +98,6 @@ workflows:
   # Python script.
   rollout:
     mapping: scripts/rollout.py
+    # In 5.0.5, the default is true. This is going to change to false
+    # in an upcoming patch, and will be false for 5.1 onwards.
     is_cascading: false

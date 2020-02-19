@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from cloudify import ctx
-from cloudify.exceptions import NonRecoverableError
 
 ctx.logger.info("Committing application")
 
@@ -11,6 +10,6 @@ ctx.logger.info("Committing application")
 # (i.e. this operation won't be automatically retried).
 fail_commit = ctx.instance.runtime_properties.get('fail_commit', False)
 if fail_commit:
-    raise NonRecoverableError("Asked to fail the rollout workflow")
+    raise Exception("Asked to fail the commit operation")
 
 ctx.logger.info("Committed application")

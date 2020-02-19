@@ -64,7 +64,7 @@ And then (assuming the node instance ID is `app_123456`):
 cfy executions start execute_operation -d dep_1 -p operation=maintenance.poll -p node_instance_ids=[app_123456]
 ```
 
-## Executing a Cusotm Workflow
+## Executing a Custom Workflow
 
 The blueprint defines a custom workflow called `rollout`. The workflow is mapped
 to a script.
